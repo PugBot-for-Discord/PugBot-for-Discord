@@ -1,5 +1,5 @@
 # Pickup Game Bot for use with discord
-# Modified by: Alex Laswell for use with Fortress Forever
+# Modified by: Alex Laswell for general use
 # Based on:
 # 	PugBot-for-Discord by techlover1 https://github.com/techlover1/PugBot-for-Discord
 
