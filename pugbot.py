@@ -39,18 +39,16 @@ quotes = config.quotes
 readyupChannelID = config.readyupChannelID
 redteamChannelID = config.redteamChannelID
 requestChannelID = config.requestChannelID
-server_address = config.server_address
 serverID = config.serverID
 serverIDRegEx = config.serverIDRegEx
 serverPattern = config.serverPattern
 serverPW = config.serverPW
 singleChannelID = config.singleChannelID
-sizeOfGame = config.sizeOfGame
 sizeOfTeams = config.sizeOfTeams
+sizeOfGame = sizeOfTeams * 2
 sizeOfMapPool = config.sizeOfMapPool
 timeoutRoleID = config.timeoutRoleID
 token = config.token
-vipPlayerID = config.vipPlayerID
 websiteKey = config.websiteKey
 websiteURL = config.websiteURL
 
@@ -275,7 +273,11 @@ async def command_is_in_wrong_channel(context):
             return True
         else:
             return False
-    elif context.command.name == "ban" or context.command.name == "permaban" or context.command.name == "unban":
+    elif (
+        context.command.name == "ban"
+        or context.command.name == "permaban"
+        or context.command.name == "unban"
+    ):
         # Admin channel commands
         if (
             context.message.channel.id != adminChannelID
@@ -734,9 +736,7 @@ async def mapname_is_valid(mpname):
     # access the global vars
     global database
     # check in name
-    cursor = database.maps.find(
-        {"$or": [{"name": mpname}, {"aliases": mpname}]}
-    )
+    cursor = database.maps.find({"$or": [{"name": mpname}, {"aliases": mpname}]})
     for map in cursor:
         return map["name"]
     # did not find mapname
@@ -1245,14 +1245,7 @@ async def save_last_game_info():
     LAST_TIME = time.time()
 
     # modify the MongoDB document's most recent pickup
-    database.pickups.update_one(
-        {"last": True},
-        {
-            "$set": {
-                "last": False,
-            }
-        },
-    )
+    database.pickups.update_one({"last": True}, {"$set": {"last": False}})
 
     # add new pickup information
     database.pickups.insert_one(
@@ -1262,7 +1255,7 @@ async def save_last_game_info():
             "map": LAST_MAP,
             "redteam": LAST_RED_TEAM,
             "time": LAST_TIME,
-        },
+        }
     )
 
 
@@ -1314,9 +1307,7 @@ async def send_information(context):
     # send each user the server and password information
     redTeamMention = []
     blueTeamMention = []
-    emb = discord.Embed(
-        title="Connect: " + serverID + "/" + serverPW, colour=0x00FF00
-    )
+    emb = discord.Embed(title="Connect: " + serverID + "/" + serverPW, colour=0x00FF00)
     emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
     # try to message players server info
     # not all players allow messages
@@ -1522,12 +1513,7 @@ async def _addalias(context):
             # first need to get the existing map and all of it's fields
             updated = database.maps.find_one_and_update(
                 filter={},
-                query={
-                    "$or": [
-                        {"name": mpname},
-                        {"aliases": mpname},
-                    ]
-                },
+                query={"$or": [{"name": mpname}, {"aliases": mpname}]},
                 update={"$addToSet": {"aliases": {"$each": aliases}}},
                 return_document=ReturnDocument.AFTER,
             )
@@ -1654,13 +1640,7 @@ async def _addserver(context):
 
                 # Mongo uses documents (key:value pairs) to represent rows of data
                 database.servers.insert(
-                    [
-                        {
-                            "names": [name],
-                            "passwd": passwd,
-                            "serverid": serverid,
-                        }
-                    ]
+                    [{"names": [name], "passwd": passwd, "serverid": serverid}]
                 )
 
                 # verify we have done this correctly
@@ -2026,11 +2006,7 @@ async def _delserver(context):
             if re.match(serverIDRegEx, message[3]):
                 serverid = message[3]
 
-                query = {
-                    "names": [name],
-                    "passwd": passwd,
-                    "serverid": serverid,
-                }
+                query = {"names": [name], "passwd": passwd, "serverid": serverid}
                 # Mongo uses documents (key:value pairs) to represent rows of data
                 removed = database.servers.delete_one(query)
                 print(
@@ -2972,7 +2948,7 @@ async def _setmode(context):
     pass_context=True,
 )
 async def _setserver(context):
-    global database, server_address, serverID, serverPW, STARTER
+    global database, serverID, serverPW, STARTER
     if await command_is_in_wrong_channel(context):
         return  # To avoid cluttering and confusion, the Bot only listens to one channel
     if not await pickup_is_running(context):
@@ -3369,7 +3345,9 @@ while True:
                 continue
             task.cancel()
             try:
-                client.loop.run_until_complete(asyncio.wait_for(task, 5, loop=client.loop))
+                client.loop.run_until_complete(
+                    asyncio.wait_for(task, 5, loop=client.loop)
+                )
                 task.exception()
             except asyncio.InvalidStateError:
                 pass
