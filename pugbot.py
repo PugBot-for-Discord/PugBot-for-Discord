@@ -19,7 +19,6 @@ from random import choice, shuffle
 import re
 import requests
 import time
-import valve.rcon
 
 # Configurable constants
 adminChannelID = config.adminChannelID
@@ -40,7 +39,6 @@ quotes = config.quotes
 readyupChannelID = config.readyupChannelID
 redteamChannelID = config.redteamChannelID
 requestChannelID = config.requestChannelID
-rconPW = config.rconPW
 server_address = config.server_address
 serverID = config.serverID
 serverIDRegEx = config.serverIDRegEx
@@ -84,12 +82,6 @@ timeoutRole = None
 # create the MongoDB client and connect to the database
 dbclient = pymongo.MongoClient(dbtoken)
 database = dbclient.FortressForever
-
-# a valve RCON (Remote CONnection)
-rcon = valve.rcon.RCON(server_address, rconPW)
-rcon.connect()
-rcon.authenticate()
-
 
 #
 # Functions A-Z
@@ -684,12 +676,6 @@ async def go_go_gadget_pickup(context):
 
     # pm users and message server with game information
     await send_information(context)
-
-    # change the map in the server to the chosen map
-    try:
-        rcon.execute("changelevel " + CHOSEN_MAP)
-    except Exception:
-        pass
 
     # move the players to their respective voice channels
     for p in RED_TEAM:
@@ -1703,13 +1689,12 @@ async def _addserver(context):
     # admin command
     if await user_has_access(member):
         message = context.message.content.split()
-        if len(message) > 4:
+        if len(message) > 3:
             # add the new server the MongoDB
             name = message[1]
             passwd = message[2]
-            rcon = message[3]
-            if re.match(serverIDRegEx, message[4]):
-                serverid = message[4]
+            if re.match(serverIDRegEx, message[3]):
+                serverid = message[3]
 
                 # Mongo uses documents (key:value pairs) to represent rows of data
                 database.servers.insert(
@@ -1717,7 +1702,6 @@ async def _addserver(context):
                         {
                             "names": [name],
                             "passwd": passwd,
-                            "rcon": rcon,
                             "serverid": serverid,
                         }
                     ]
@@ -1737,7 +1721,9 @@ async def _addserver(context):
                     context.message.author.mention
                     + "\n\nThat is not a valid server id, use:\n\n"
                     + cmdprefix
-                    + "addserver <name> <password> <rcon_password> <###.###.###.###:27015>\n\nPlease try again",
+                    + "addserver <name> <password> <"
+                    + serverPattern
+                    + ">\n\nPlease try again",
                     context,
                 )
         else:
@@ -1746,7 +1732,9 @@ async def _addserver(context):
                 context.message.author.mention
                 + "\n\nThat is not how you use this command, use:\n\n"
                 + cmdprefix
-                + "addserver <name> <password> <rcon_password> <###.###.###.###:27015>\n\nPlease try again",
+                + "addserver <name> <password> <"
+                + serverPattern
+                + ">\n\nPlease try again",
                 context,
             )
     else:
@@ -2004,71 +1992,6 @@ async def _bitcoin():
     await Bot.say("Bitcoin price is currently: $" + value)
 
 
-# Changelevel
-@Bot.command(
-    name="changelevel",
-    description="Change the map in the server using the RCON commange changelevel",
-    brief="Change the map in serever",
-    aliases=[
-        "changemap",
-        "rcon changemap",
-        "rcon_changemap",
-        "rcon changelevel",
-        "rcon_changelevel",
-    ],
-    pass_context=True,
-)
-async def _changelevel(context):
-    global rcon
-    if await command_is_in_wrong_channel(context):
-        return  # To avoid cluttering and confusion, the Bot only listens to one channel
-    # admin command
-    if await user_has_access(context.message.author):
-        message = context.message.content.split()
-        # make sure the user provided a map
-        if len(message) > 1:
-            # check to see if the provided map is in the database
-            atom = await mapname_is_valid(message[1])
-            if atom != "INVALID":
-                # change the map in the server to the provided map
-                try:
-                    rcon.execute("changelevel " + atom)
-                except Exception:
-                    pass
-                await send_emb_message_to_channel(
-                    0x00FF00,
-                    context.message.author.mention
-                    + " the map has been changed to "
-                    + atom,
-                    context,
-                )
-            else:
-                await send_emb_message_to_channel(
-                    0xFF0000,
-                    context.message.author.mention
-                    + " that map is not in my "
-                    + cmdprefix
-                    + "maplist. Please make another selection",
-                    context,
-                )
-                await list_all_the_maps(context.message)
-        else:
-            await send_emb_message_to_channel(
-                0xFF0000,
-                context.message.author.mention
-                + " you must provide a mapname. "
-                + cmdprefix
-                + "changemap mapname",
-                context,
-            )
-    else:
-        await send_emb_message_to_channel(
-            0xFF0000,
-            context.message.author.mention + " you do not have access to this command",
-            context,
-        )
-
-
 # Delete Map
 @Bot.command(
     name="delmap",
@@ -2140,18 +2063,16 @@ async def _delserver(context):
     # admin command
     if await user_has_access(member):
         message = context.message.content.split()
-        if len(message) > 4:
+        if len(message) > 3:
             # add the new server the MongoDB
             name = message[1]
             passwd = message[2]
-            rcon = message[3]
-            if re.match(serverIDRegEx, message[4]):
-                serverid = message[4]
+            if re.match(serverIDRegEx, message[3]):
+                serverid = message[3]
 
                 query = {
                     "names": [name],
                     "passwd": passwd,
-                    "rcon": rcon,
                     "serverid": serverid,
                 }
                 # Mongo uses documents (key:value pairs) to represent rows of data
@@ -2177,7 +2098,9 @@ async def _delserver(context):
                     context.message.author.mention
                     + "\n\nThat is not a valid server id, use:\n\n"
                     + cmdprefix
-                    + "addserver <name> <password> <rcon_password> <###.###.###.###:27015>\n\nPlease try again",
+                    + "addserver <name> <password> <"
+                    + serverPattern
+                    + ">\n\nPlease try again",
                     context,
                 )
         else:
@@ -2186,7 +2109,9 @@ async def _delserver(context):
                 context.message.author.mention
                 + "\n\nThat is not how you use this command, you must do:\n\n"
                 + cmdprefix
-                + "delserver name password rcon_password ###.###.###.###:27015\n\nYour entries must match exactly. Please try again",
+                + "delserver name password "
+                + serverPattern
+                + "\n\nYour entries must match exactly. Please try again",
                 context,
             )
     else:
@@ -3190,7 +3115,7 @@ async def _setmode(context):
     pass_context=True,
 )
 async def _setserver(context):
-    global database, server_address, serverID, serverPW, rcon, rconPW, STARTER
+    global database, server_address, serverID, serverPW, STARTER
     if await command_is_in_wrong_channel(context):
         return  # To avoid cluttering and confusion, the Bot only listens to one channel
     if not await pickup_is_running(context):
@@ -3209,30 +3134,19 @@ async def _setserver(context):
                     cursor = database.servers.find({"names": data})
                 elif op == "server":
                     cursor = database.servers.find({"serverid": data})
-                # TODO: Add an option to supply a server in the command
                 # check for a match
                 if cursor is not None and cursor.count() > 0:
                     for doc in cursor:
                         # doc is a dict
                         serverID = doc["serverid"]
                         serverPW = doc["passwd"]
-                        rconPW = doc["rcon"]
-                        server_address = (serverID[:-6], 27015)
-                        # reset rcon to our new RCON connection
-                        rcon = valve.rcon.RCON(server_address, rconPW)
-                        rcon.connect()
-                        rcon.authenticate()
                         await send_emb_message_to_user(
                             0x00FF00,
                             context.message.author.mention
                             + " changing server\n\nServerID: "
                             + serverID
-                            + "\n\nServer Address: "
-                            + str(server_address)
                             + "\n\nPassword: "
-                            + serverPW
-                            + "\n\nRCON: "
-                            + rconPW,
+                            + serverPW,
                             context,
                         )
                 else:
@@ -3254,7 +3168,7 @@ async def _setserver(context):
                     + cmdprefix
                     + "setserver name serverAlias\n"
                     + cmdprefix
-                    + "server serverID "
+                    + "setserver serverID "
                     + serverPattern
                     + "\n\nPlease try again",
                     context,
