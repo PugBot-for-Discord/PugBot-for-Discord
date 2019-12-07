@@ -315,8 +315,6 @@ async def command_is_in_wrong_channel(context):
 
 async def count_votes_message_channel(tdelta, keys, context, votelist, votetotals):
     global sizeOfMapPool
-    values = []
-    totals = {}
     tmpstr = ""
     # reset totals
     votetotals = []
@@ -698,9 +696,6 @@ async def go_go_gadget_pickup(context):
         playerPoolStr += RED_TEAM[i].name + ","
     playerPoolStr = playerPoolStr[:-1]  # delete the last comma
 
-    # POST to the information to the website
-    await post_to_website(playerPoolStr)
-
     # remove the players from the pool
     await remove_everyone_from_pool_role(context)
     return True
@@ -715,46 +710,22 @@ async def list_all_the_maps(msg):
     maps = list(foundmaps)
 
     # with the aliases, this message gets big quickly so we
-    # need to chunk up the maplist into sections to accomidate
-
-    ## Part I   ##
+    # need to chunk up the maplist into sections to accommodate
     emb = discord.Embed(
         description="Currently, you may nominate any of the following maps:",
         colour=0xFFA500,
     )
     emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[:20]:
+
+    # print the maps in groups of 20
+    iCount = 0
+    for map in maps:
+        if iCount % 20 == 0:
+            await Bot.send_message(msg.author, embed=emb)
+            emb = discord.Embed(description="", colour=0xFFA500)
+            emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
         emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
-    await Bot.send_message(msg.author, embed=emb)
-    ## Part II  ##
-    emb = discord.Embed(description="", colour=0xFFA500)
-    emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[20:40]:
-        emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
-    await Bot.send_message(msg.author, embed=emb)
-    ## Part III ##
-    emb = discord.Embed(description="", colour=0xFFA500)
-    emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[40:60]:
-        emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
-    await Bot.send_message(msg.author, embed=emb)
-    ## Part IV  ##
-    emb = discord.Embed(description="", colour=0xFFA500)
-    emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[60:80]:
-        emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
-    await Bot.send_message(msg.author, embed=emb)
-    ## Part V  ##
-    emb = discord.Embed(description="", colour=0xFFA500)
-    emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[80:100]:
-        emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
-    await Bot.send_message(msg.author, embed=emb)
-    ## Part VI ##
-    emb = discord.Embed(description="", colour=0xFFA500)
-    emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
-    for map in maps[100:]:
-        emb.add_field(name=str(map["name"]), value=str(map["aliases"]), inline=False)
+        iCount += 1
     await Bot.send_message(msg.author, embed=emb)
 
 
@@ -764,7 +735,7 @@ async def mapname_is_valid(mpname):
     global database
     # check in name
     cursor = database.maps.find(
-        {"$or": [{"name": mpname}, {"name": "ff_" + mpname}, {"aliases": mpname}]}
+        {"$or": [{"name": mpname}, {"aliases": mpname}]}
     )
     for map in cursor:
         return map["name"]
@@ -1211,28 +1182,6 @@ async def pickup_is_running(context):
         return False
 
 
-async def post_to_website(playerPoolStr):
-    global CHOSEN_MAP, RANDOM_TEAMS, sizeOfGame, STARTER
-    if RANDOM_TEAMS:
-        mode = "pool"
-    else:
-        mode = "team"
-    payload = {
-        "1": STARTER[0].name,
-        "2": mode,
-        "3": CHOSEN_MAP,
-        "4": sizeOfGame,
-        "5": playerPoolStr,
-        "k": websiteKey,
-    }
-    resp = requests.post(websiteURL, params=payload)
-    if resp.status_code == requests.codes.ok:
-        return
-    else:
-        print("LOG MESSAGE: " + resp.raise_for_status())
-        return
-
-
 # Select the RED_TEAM
 async def red_team_picks(caps, context, playerPool):
     global BLUE_TEAM, RED_TEAM, PLAYERS, server
@@ -1295,16 +1244,24 @@ async def save_last_game_info():
     [LAST_RED_TEAM.append(p.name) for p in RED_TEAM]
     LAST_TIME = time.time()
 
-    # modify the MongoDB document to contain the most recent pickup information
-    updated = database.pickups.update_one(
+    # modify the MongoDB document's most recent pickup
+    database.pickups.update_one(
         {"last": True},
         {
             "$set": {
-                "blueteam": LAST_BLUE_TEAM,
-                "redteam": LAST_RED_TEAM,
-                "map": LAST_MAP,
-                "time": LAST_TIME,
+                "last": False,
             }
+        },
+    )
+
+    # add new pickup information
+    database.pickups.insert_one(
+        {
+            "blueteam": LAST_BLUE_TEAM,
+            "last": True,
+            "map": LAST_MAP,
+            "redteam": LAST_RED_TEAM,
+            "time": LAST_TIME,
         },
     )
 
@@ -1358,7 +1315,7 @@ async def send_information(context):
     redTeamMention = []
     blueTeamMention = []
     emb = discord.Embed(
-        title="steam://connect/" + serverID + "/" + serverPW, colour=0x00FF00
+        title="Connect: " + serverID + "/" + serverPW, colour=0x00FF00
     )
     emb.set_author(name=Bot.user.name, icon_url=Bot.user.avatar_url)
     # try to message players server info
@@ -1568,7 +1525,6 @@ async def _addalias(context):
                 query={
                     "$or": [
                         {"name": mpname},
-                        {"name": "ff_" + mpname},
                         {"aliases": mpname},
                     ]
                 },
@@ -2120,22 +2076,6 @@ async def _delserver(context):
             context.message.author.mention + " you do not have access to this command",
             context,
         )
-
-
-# Demos
-@Bot.command(
-    name="demos",
-    description="Provides the message author with a link to the currently stored demos via direct message",
-    brief="Get a link to the demos",
-    aliases=["demo", "recordings", "recording"],
-    pass_context=True,
-)
-async def _demos(context):
-    await send_emb_message_to_user(
-        0xFFA500,
-        "SourceTV demos can be found here: http://www.ffpickup.com/?p=demos",
-        context,
-    )
 
 
 # End
@@ -2780,89 +2720,6 @@ async def _eight_ball(context):
     await Bot.say(choice(possible_responses) + " " + context.message.author.mention)
 
 
-# Radicaldad
-@Bot.command(name="radicaldad", description="", brief="Not for you", pass_context=True)
-async def _radicaldad(context):
-    global CHOSEN_MAP, MAP_PICKS, PICKUP_RUNNING, PLAYERS, poolRole, sizeOfGame, STARTER, vipPlayerID, VOTE_FOR_MAPS
-    # same as add but with the restriction on ID
-    if context.message.author.id == vipPlayerID:
-        if not await pickup_is_running(context):
-            return  # there must be an active pickup
-        if context.message.author in PLAYERS:
-            await send_emb_message_to_channel(
-                0xFF0000,
-                context.message.author.mention
-                + " you have already added to this pickup",
-                context,
-            )
-            return
-        elif len(PLAYERS) == sizeOfGame:
-            await send_emb_message_to_channel(
-                0xFF0000,
-                context.message.author.mention
-                + " sorry, the game is currently full\nYou will have to wait until the next one starts",
-                context,
-            )
-            return
-        else:  # all clear to add them
-            # add to pool for easier notification
-            try:
-                await Bot.add_roles(context.message.author, poolRole)
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            PLAYERS.append(context.message.author)
-            await send_emb_message_to_channel(
-                0x00FF00,
-                context.message.author.mention
-                + " you have been added to the pickup.\nThere are currently "
-                + str(len(PLAYERS))
-                + "/"
-                + str(sizeOfGame)
-                + " Players in the pickup",
-                context,
-            )
-            await Bot.change_presence(
-                game=discord.Game(
-                    name="Pickup ("
-                    + str(len(PLAYERS))
-                    + "/"
-                    + str(sizeOfGame)
-                    + ") "
-                    + cmdprefix
-                    + "add"
-                )
-            )
-
-        # each time someone adds, we need to check to see if the pickup is full
-        if len(PLAYERS) == sizeOfGame:
-            # start the pickup
-            reset = await go_go_gadget_pickup(context)
-            if reset:
-                # Reset so we can play another one
-                CHOSEN_MAP = []
-                MAP_PICKS = {}
-                PLAYERS = []
-                STARTER = []
-                PICKUP_RUNNING = False
-                VOTE_FOR_MAPS = True
-
-
-# Records
-@Bot.command(
-    name="records",
-    description="Get a link to the All-time Records on ffpickup.com",
-    brief="Get a link to the All-time Records",
-    aliases=["alltime", "alltime_records", "best"],
-    pass_context=True,
-)
-async def _records(context):
-    await send_emb_message_to_user(
-        0xFFA500,
-        "All-time Records (work in progress): http://parser.ffpickup.com/v2/records/",
-        context,
-    )
-
-
 # Remove
 @Bot.command(
     name="remove",
@@ -3202,7 +3059,7 @@ async def _sendinfo(context):
     if await command_is_in_wrong_channel(context):
         return  # To avoid cluttering and confusion, the Bot only listens to one channel
     await send_emb_message_to_user(
-        0x00FF00, "steam://connect/" + serverID + "/" + serverPW, context
+        0x00FF00, "Connect: " + serverID + "/" + serverPW, context
     )
 
 
