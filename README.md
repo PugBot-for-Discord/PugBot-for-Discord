@@ -39,5 +39,5 @@ PugBot for discord is a bot for managing pickup games.
 
 - Python 3.5+
 - [discord](https://github.com/Rapptz/discord.py)
-- [pymongo](https://www.mongodb.com/blog/post/getting-started-with-python-and-mongodb)
+- [pymongo](https://api.mongodb.com/python/current/)
 - [requests](https://github.com/requests/requests)
