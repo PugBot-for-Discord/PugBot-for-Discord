@@ -5,13 +5,15 @@ PugBot for discord is a bot for managing pickup games.
 ## Installing
 
 ### Pre-Requisites 
-- You will need to create an AWS EC2 or similar linux box
+- Create an AWS EC2 or similar linux box
   - Instuctions on getting started can be found here https://aws.amazon.com/ec2/
     - Once setup, install all files and folders to your home directory
-- You will also need to create and setup two (2) discord bots
+- Create and setup two (2) discord bots
   - Instructions on this can be found here https://discordpy.readthedocs.io/en/latest/discord.html
     - Two bots are needed; one is to run the pickup games (token) and the other handles the banning/unbanning process (banHammerToken)
-- Your discord server (discordServerID) must have the following channels/roles:
+- Create a mongoDB to hold the last pickup and server + alias information. 
+  - Instructions on this can be found here https://www.mongodb.com/blog/post/getting-started-with-python-and-mongodb
+- Modify your discord server (discordServerID) to include the following channels/roles:
   - Channels:
     - admin channel (adminChannelID)
     - banned channel (bannedChannelID)
@@ -27,7 +29,6 @@ PugBot for discord is a bot for managing pickup games.
     - timeout role (timeoutRoleID) - role given to banned players 
     
 ### Getting Started
-- Create a mongoDB to hold the last pickup and server + alias information. If you are unsure how to do this, a quick start tutorial can be found at the link provided below.
 - Setup the mongoDB by running `python3 ./mongodb.py`
   - You will need to modify this file to match your game configuration
 - Rename `config.py.example` to `config.py`
